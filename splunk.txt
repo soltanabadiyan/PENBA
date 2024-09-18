@@ -1,0 +1,97 @@
+index=cicids_2017_new   | bucket _time span=1h | stats   count as P1_rph by ip_src,_time  | fillnull value=0 | where P1_rph > 100
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new    ws_col_Protocol="*DNS"  | bucket _time span=1h | stats   dc(req_domain) as P2_unique_dns_req by ip_src,_time  | fillnull value=0]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new  ws_col_Protocol="*DNS"  | bucket _time span=1h | stats    count(req_domain) as P3_domain_rph by ip_src,req_domain,_time   | fillnull value=0]
+
+| join  type=left ip_src,_time 
+[ search index=cicids_2017_new   ws_col_Protocol="*DNS" |
+ bucket _time span=1h| 
+  stats  count as cnt by ip_src,_time |
+   eval P4_avg_rpm=ceil(cnt/60) | fillnull value=0 |
+    table _time, ip_src,P4_avg_rpm ]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new    ws_col_Protocol="*DNS"  | bucket _time span=1m | stats    count(ip_src) as tmp_res by ip_src,_time  | bucket _time span=1h|  stats  min(tmp_res) as P5_high_req by ip_src,_time   | fillnull value=0]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new    ws_col_Protocol="*DNS" "MX" | bucket _time span=1h | stats    count(ip_src) as P6_mx by ip_src,_time   | fillnull value=0]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new    ws_col_Protocol="*DNS" "PTR"| bucket _time span=1h | stats   count as P7_ptr by ip_src,_time  | fillnull value=0]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new    " NS " ws_col_Protocol="*DNS"  "Standard query"  | bucket _time span=1h | stats dc(ip_dst) as P8_dnsserver by ip_src,_time]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new    ws_col_Protocol="*DNS"   | bucket _time span=1h | stats    dc(TDL) as P9_TDL by ip_src,_time  | fillnull value=0] 
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new    ws_col_Protocol="*DNS"  | bucket _time span=1h | stats    dc(req_domain) as P10_SDL by ip_src,_time  | fillnull value=0]
+
+
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new   ws_col_Protocol="*DNS"   | bucket _time span=1h | eventstats    dc(req_domain) as dc_count by ip_src,_time  | eventstats    count(req_domain) as all_count by ip_src,_time  | eval P11_unique_ratio=abs((dc_count/all_count)) | table ip_src,_time,P11_unique_ratio,dc_count,all_count  | fillnull value=0]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new    ws_col_Protocol="*DNS" "fail*" | bucket _time span=1h | stats    count(ip_src) as P12_nx by ip_src,_time    | fillnull value=0]
+
+| join  type=left ip_src,_time 
+
+
+
+[search index="cicids_2017_new"  | bucket _time span=1h |eval  DNS=if(match(ws_col_Protocol,"DNS"),"1","0") | stats avg(DNS) as P13_flow_ratio by ip_src,_time]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new   ws_col_Protocol="*DNS"| bucket _time span=1h | stats   count as P14_dnsrph by ip_src,_time  | table ip_src,_time,P14_dnsrph  | fillnull value=0]
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new  | bucket _time span=1h | stats  avg(ip_len) as P15_len by ip_src,_time  | table ip_src,_time,P15_len | fillnull value=0]
+| join  type=left ip_src,_time 
+[
+    search index="cicids_2017_new"   ws_col_Protocol=tcp tcp_dstport="6667" |
+      bucket _time span=1h  | stats    count as P16_IRC_ratio by ip_src,_time    
+      | fillnull value=0 
+
+]
+
+
+| join  type=left ip_src,_time 
+[search index=cicids_2017_new ws_col_Protocol="*DNS"  | eval tmp=len(req_domain)| bucket _time span=1h | stats    avg(tmp) as P17_domain_length by ip_src,_time | where P17_domain_length>0| fillnull value=0]
+
+
+
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h |eval  SMB=if(match(ws_col_Protocol,"SMB*"),"1","0") | stats avg(SMB) as P18_SMB_ratio by ip_src,_time| fillnull value=0]
+
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h |eval  TLS=if(match(ws_col_Protocol,"TLSv*"),"1","0") | stats avg(TLS) as P19_TLS_ratio by ip_src,_time| fillnull value=0]
+
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h |eval  SSH=if(match(ws_col_Protocol,"SSH*"),"1","0") | stats avg(SSH) as P20_SSH_ratio by ip_src,_time| fillnull value=0]
+
+| join  type=left ip_src,_time 
+
+[search index="cicids_2017_new"  |eval  MQTT=if(match(tcp_dstport,"1883"),"1","0")   |
+      bucket _time span=1h  | stats    avg(MQTT) as P21_MQTT_ratio by ip_src,_time    
+      | fillnull value=0 
+]
+
+| join  type=left ip_src,_time 
+[
+    search index="cicids_2017_new"   |eval  TFTP=if(match(udp_dstport,"69"),"1","0") |
+      bucket _time span=1h  | stats    avg(TFTP) as P22_TFTP_ratio by ip_src,_time    
+      | fillnull value=0
+]
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h |eval  NBNS=if(match(ws_col_Protocol,"NBNS"),"1","0") | stats avg(NBNS) as P23_NBNS_ratio by ip_src,_time| fillnull value=0]
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h |eval  TCP=if(match(ws_col_Protocol,"TCP"),"1","0") | stats avg(TCP) as P24_TCP_ratio by ip_src,_time| fillnull value=0  ]
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h |eval  DCERPC=if(match(ws_col_Protocol,"DCERPC"),"1","0") | stats avg(DCERPC) as P25_DCERPC_ratio by ip_src,_time| fillnull value=0]
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h |eval  ICMP=if(match(ws_col_Protocol,"DCERPC"),"1","0") | stats avg(ICMP) as P26_ICMP_ratio by ip_src,_time| fillnull value=0]
+| join  type=left ip_src,_time 
+[
+   search index="cicids_2017_new"  |eval  DHCP=if(match(udp_dstport,"68"),"1","0")|
+      bucket _time span=1h  | stats    avg(DHCP) as P27_DHCP_ratio by ip_src,_time    
+      | fillnull value=0
+
+]
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h | stats dc(ip_dst) as P28_UNIQUEDST_count by ip_src,_time| fillnull value=0]
+| join  type=left ip_src,_time 
+[search index="cicids_2017_new" | bucket _time span=1h | stats count(ip_dst) as P29_DST_count by ip_src,_time| fillnull value=0 f]
+
+| rename _time as ReqTime | fillnull value=0  | streamstats count as RowNo | table RowNo,P1_rph,P2_unique_dns_req,P3_domain_rph,P4_avg_rpm,P5_high_req,P6_mx,P7_ptr,P8_dnsserver,P9_TDL,P10_SDL,P11_unique_ratio,P12_nx,P13_flow_ratio,P14_dnsrph,P15_len,P16_IRC_ratio,P17_domain_length,P18_SMB_ratio,P19_TLS_ratio,P20_SSH_ratio,P21_MQTT_ratio,P22_TFTP_ratio,P23_NBNS_ratio,P24_TCP_ratio,P25_DCERPC_ratio,P26_ICMP_ratio,P27_DHCP_ratio,P28_UNIQUEDST_count,P29_DST_count,ReqTime,ip_src
